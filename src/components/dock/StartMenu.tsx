@@ -55,17 +55,17 @@ export const StartMenu: React.FC = () => {
       <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 font-semibold text-sm">
-            {currentUser.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
+            {(currentUser?.name || 'TI').split(' ').map(n => n[0]).slice(0, 2).join('')}
           </div>
           <div>
             <div className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
-              <span>{currentUser.name}</span>
+              <span>{currentUser?.name || 'Usuário'}</span>
               <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 2FA
               </span>
             </div>
             <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
-              <span className="font-mono text-blue-400 font-medium">{currentUser.role}</span>
+              <span className="font-mono text-blue-400 font-medium">{currentUser?.role || 'SUPORTE_N1'}</span>
               <span>·</span>
               <span className="truncate max-w-[200px]">{currentUser.clienteAtribuicao || currentUser.departamento || 'Central ESDI'}</span>
             </div>

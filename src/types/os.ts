@@ -21,7 +21,7 @@ export type AppCategory =
   | 'infra'         // Infraestrutura, Terminal, Diagnóstico
   | 'utilitarios';   // Cadastrar App, Usuários, Ferramentas gerais
 
-export type WindowEmbedType = 'native' | 'iframe' | 'external_tab';
+export type WindowEmbedType = 'native' | 'iframe' | 'external_tab' | 'executable';
 
 export interface AppDefinition {
   id: string;
@@ -32,6 +32,9 @@ export interface AppDefinition {
   allowedRoles: UserRole[];
   embedType: WindowEmbedType;
   url?: string;
+  executablePath?: string;
+  executableArgs?: string[];
+  protocolUri?: string;
   blocksIframe?: boolean;
   defaultWidth?: number;
   defaultHeight?: number;

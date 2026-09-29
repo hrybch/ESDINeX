@@ -112,11 +112,15 @@ export interface GlpiPlanningItem {
 
 export interface GlpiApiConfig {
   baseUrl: string; // ex: https://sistema.esdi.com.br
-  apiPath: string; // default: /apirest.php
+  apiPath: string; // ex: /api.php/v2.2
+  ticketEndpoint: string; // default: /Assistance/Ticket
   appToken: string;
   userToken: string;
+  bearerToken?: string; // Token OAuth / JWT (Bearer ...)
   sessionToken?: string;
   isConnected: boolean;
   lastSync?: string;
+  lastError?: string;
   isMockFallback: boolean;
+  autoRefreshInterval: number; // Intervalo em segundos (default: 30s)
 }

@@ -27,8 +27,23 @@ export const Desktop: React.FC = () => {
   // Desktop icons (only apps that belong to currentUser.role and flagged for desktop)
   const desktopApps = authorizedApps.filter(app => app.onDesktop);
 
+  // Selected icon on desktop (single-selection model)
+  const [selectedAppId, setSelectedAppId] = React.useState<string | null>(null);
+
+  // Deselect on Escape key
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedAppId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleDesktopClick = () => {
     closeStartMenu();
+    setSelectedAppId(null); // Clears icon selection when clicking anywhere on the desktop
   };
 
   return (
@@ -89,8 +104,8 @@ export const Desktop: React.FC = () => {
 
           {/* User info */}
           <div className="text-slate-400 text-[11px] flex items-center gap-1">
-            <span>{currentUser.name.split(' ')[0]}</span>
-            <span className="text-blue-400 font-mono font-medium">({currentUser.role})</span>
+            <span>{(currentUser?.name || 'Usuário').split(' ')[0]}</span>
+            <span className="text-blue-400 font-mono font-medium">({currentUser?.role || 'SUPORTE_N1'})</span>
           </div>
 
           <span className="text-slate-700">|</span>
@@ -121,7 +136,16 @@ export const Desktop: React.FC = () => {
         {/* Desktop Icons Grid */}
         <div className="flex flex-col flex-wrap items-start content-start gap-5 h-full max-h-[calc(100vh-120px)] w-fit z-10">
           {desktopApps.map(app => (
-            <DesktopIcon key={app.id} app={app} onOpen={openWindow} />
+            <DesktopIcon 
+              key={app.id} 
+              app={app} 
+              isSelected={selectedAppId === app.id}
+              onSelect={() => setSelectedAppId(app.id)}
+              onOpen={(appId) => {
+                setSelectedAppId(null);
+                openWindow(appId);
+              }} 
+            />
           ))}
         </div>
 

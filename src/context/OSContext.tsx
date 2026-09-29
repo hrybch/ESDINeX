@@ -25,7 +25,7 @@ interface OSContextType {
   setCurrentUser: (user: UserProfile) => void;
   addUser: (user: UserProfile) => void;
   updateUser: (id: string, updates: Partial<UserProfile>) => void;
-  deleteUser: (id: string) => void;
+  deleteUser: (id: string) => { success: boolean; message: string };
   setUserRole: (role: UserRole) => void;
 
   // Apps & Window Management
@@ -33,6 +33,8 @@ interface OSContextType {
   authorizedApps: AppDefinition[];
   registerApp: (app: AppDefinition) => void;
   removeCustomApp: (appId: string) => void;
+  deleteApp: (appId: string) => boolean;
+  restoreDefaultApps: () => void;
   windows: WindowInstance[];
   activeWindowId: string | null;
   openWindow: (appId: string, customData?: Record<string, unknown>) => void;
@@ -45,8 +47,10 @@ interface OSContextType {
   toggleStartMenu: () => void;
   closeStartMenu: () => void;
   notifications: SystemNotification[];
+  addNotification: (notification: Omit<SystemNotification, 'id' | 'timestamp' | 'read'>) => void;
   markNotificationAsRead: (id: string) => void;
   systemTime: string;
+  launchLocalExecutable: (app: Partial<AppDefinition>) => Promise<{ success: boolean; message?: string; error?: string }>;
 
   // Central Tickets
   tickets: EsdiTicket[];
@@ -129,9 +133,29 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }
   }, [customApps]);
 
+  // Deleted app ids blacklist stored in localStorage
+  const [deletedAppIds, setDeletedAppIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('cartorio_os_deleted_app_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('cartorio_os_deleted_app_ids', JSON.stringify(deletedAppIds));
+    } catch {
+      // ignore
+    }
+  }, [deletedAppIds]);
+
   const allApps = useMemo(() => {
-    return [...DEFAULT_APPS_REGISTRY, ...customApps];
-  }, [customApps]);
+    return [...DEFAULT_APPS_REGISTRY, ...customApps].filter(
+      app => !deletedAppIds.includes(app.id)
+    );
+  }, [customApps, deletedAppIds]);
 
   const [windows, setWindows] = useState<WindowInstance[]>([]);
   const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
@@ -242,9 +266,59 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     );
   }, [currentUser.id]);
 
-  const deleteUser = useCallback((id: string) => {
-    setUsers(prev => prev.filter(u => u.id !== id));
-  }, []);
+  const deleteUser = useCallback((id: string): { success: boolean; message: string } => {
+    // 1. Regra de Segurança: Não permitir excluir a própria conta logada
+    if (id === currentUser.id) {
+      return {
+        success: false,
+        message: 'Você não pode excluir a sua própria conta enquanto estiver logado com ela.',
+      };
+    }
+
+    // 2. Regra de Segurança: Não permitir excluir o último usuário do sistema
+    if (users.length <= 1) {
+      return {
+        success: false,
+        message: 'O sistema deve possuir pelo menos um usuário técnico ativo cadastrado.',
+      };
+    }
+
+    const userToDelete = users.find(u => u.id === id);
+    if (!userToDelete) {
+      return {
+        success: false,
+        message: 'Usuário não encontrado.',
+      };
+    }
+
+    setUsers(prev => {
+      const remaining = prev.filter(u => u.id !== id);
+      try {
+        localStorage.setItem('esdinex_users_registry', JSON.stringify(remaining));
+      } catch {
+        // ignore
+      }
+      return remaining;
+    });
+
+    // Notificação de auditoria
+    setNotifications(prev => [
+      {
+        id: `notif_${Date.now()}`,
+        title: 'Usuário Removido',
+        message: `O cadastro do usuário "${userToDelete.name}" (${userToDelete.email}) foi removido.`,
+        type: 'warning',
+        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        read: false,
+      },
+      ...prev,
+    ]);
+
+    return {
+      success: true,
+      message: `Usuário "${userToDelete.name}" excluído com sucesso do sistema.`,
+    };
+  }, [currentUser.id, users]);
 
   const setUserRole = useCallback((role: UserRole) => {
     const user = users.find(u => u.role === role) || {
@@ -255,15 +329,70 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   }, [users, currentUser]);
 
   const registerApp = useCallback((newApp: AppDefinition) => {
+    // Se o ID estava na lista de deletados, remove da lista de deletados
+    setDeletedAppIds(prev => prev.filter(id => id !== newApp.id));
     setCustomApps(prev => {
       const filtered = prev.filter(a => a.id !== newApp.id);
       return [...filtered, newApp];
     });
   }, []);
 
-  const removeCustomApp = useCallback((appId: string) => {
+  const deleteApp = useCallback((appId: string): boolean => {
+    const targetApp = allApps.find(a => a.id === appId);
+
+    // 1. Adiciona à lista de deletados (para apps padrão ou customizados)
+    setDeletedAppIds(prev => Array.from(new Set([...prev, appId])));
+
+    // 2. Remove da lista de customizados
     setCustomApps(prev => prev.filter(a => a.id !== appId));
+
+    // 3. Fecha todas as janelas abertas deste aplicativo
     setWindows(prev => prev.filter(w => w.appId !== appId));
+
+    // 4. Reseta a janela ativa se pertencia ao app excluído
+    setActiveWindowId(currentActive => {
+      const activeWindow = windows.find(w => w.id === currentActive);
+      return activeWindow?.appId === appId ? null : currentActive;
+    });
+
+    // 5. Emite notificação de auditoria
+    setNotifications(prev => [
+      {
+        id: `notif_${Date.now()}`,
+        title: 'Aplicativo Excluído',
+        message: `O atalho "${targetApp?.title || appId}" foi removido do ESDINeX.`,
+        type: 'warning',
+        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        read: false,
+      },
+      ...prev,
+    ]);
+
+    return true;
+  }, [allApps, windows]);
+
+  const removeCustomApp = useCallback((appId: string) => {
+    deleteApp(appId);
+  }, [deleteApp]);
+
+  const restoreDefaultApps = useCallback(() => {
+    setDeletedAppIds([]);
+    try {
+      localStorage.removeItem('cartorio_os_deleted_app_ids');
+    } catch {
+      // ignore
+    }
+    setNotifications(prev => [
+      {
+        id: `notif_${Date.now()}`,
+        title: 'Aplicativos Padrão Restaurados',
+        message: 'Todos os aplicativos padrão do ESDINeX foram restaurados.',
+        type: 'success',
+        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        read: false,
+      },
+      ...prev,
+    ]);
   }, []);
 
   const addTicket = useCallback((ticket: EsdiTicket) => {
@@ -288,11 +417,82 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     setActiveWindowId(windowId);
   }, []);
 
+  const launchLocalExecutable = useCallback(async (app: Partial<AppDefinition>): Promise<{ success: boolean; message?: string; error?: string }> => {
+    const targetPath = app.executablePath || app.url || '';
+    const args = app.executableArgs || [];
+
+    try {
+      const response = await fetch('/api/launch-app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: targetPath,
+          args,
+          protocolUri: app.protocolUri,
+          title: app.title || 'Aplicativo Local',
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setNotifications(prev => [
+          {
+            id: `notif_${Date.now()}`,
+            title: `${app.title || 'Aplicativo'} Iniciado`,
+            message: `Executado na máquina local: ${targetPath}`,
+            type: 'success',
+            timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            read: false,
+          },
+          ...prev,
+        ]);
+        return { success: true, message: data.message };
+      } else {
+        throw new Error(data.error || 'Falha ao executar via API local');
+      }
+    } catch (err: any) {
+      if (app.protocolUri) {
+        window.location.href = app.protocolUri;
+        setNotifications(prev => [
+          {
+            id: `notif_${Date.now()}`,
+            title: `Iniciando ${app.title || 'Aplicativo'}`,
+            message: `Tentativa disparada via protocolo: ${app.protocolUri}`,
+            type: 'info',
+            timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            read: false,
+          },
+          ...prev,
+        ]);
+        return { success: true, message: `Disparado via protocolo ${app.protocolUri}` };
+      }
+
+      setNotifications(prev => [
+        {
+          id: `notif_${Date.now()}`,
+          title: `Falha ao Abrir ${app.title || 'Programa'}`,
+          message: `Não foi possível iniciar "${targetPath}". Verifique se o executável existe nesta máquina.`,
+          type: 'alert',
+          timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          read: false,
+        },
+        ...prev,
+      ]);
+      return { success: false, error: err?.message || 'Erro ao executar o programa' };
+    }
+  }, []);
+
   const openWindow = useCallback((appId: string, customData?: Record<string, unknown>) => {
     const app = allApps.find(a => a.id === appId);
     if (!app) return;
 
     setIsStartMenuOpen(false);
+
+    // Se for atalho para executável instalado na máquina local
+    if (app.embedType === 'executable') {
+      launchLocalExecutable(app);
+      return;
+    }
 
     // If already open, bring to front
     const existing = windows.find(w => w.appId === appId);
@@ -392,6 +592,16 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     setIsStartMenuOpen(false);
   }, []);
 
+  const addNotification = useCallback((notif: Omit<SystemNotification, 'id' | 'timestamp' | 'read'>) => {
+    const newNotif: SystemNotification = {
+      ...notif,
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      read: false,
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+  }, []);
+
   const markNotificationAsRead = useCallback((id: string) => {
     setNotifications(prev =>
       prev.map(n => (n.id === id ? { ...n, read: true } : n))
@@ -425,6 +635,8 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         authorizedApps,
         registerApp,
         removeCustomApp,
+        deleteApp,
+        restoreDefaultApps,
         windows,
         activeWindowId,
         openWindow,
@@ -437,8 +649,10 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         toggleStartMenu,
         closeStartMenu,
         notifications,
+        addNotification,
         markNotificationAsRead,
         systemTime,
+        launchLocalExecutable,
         tickets,
         addTicket,
         resolveTicket,

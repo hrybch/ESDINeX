@@ -4,12 +4,16 @@
  * Enforces standardized ITIL status and urgency mappings.
  */
 
+import { GlpiApiConfig } from '../types/glpi';
+
 // Environment variables configuration
 export const GLPI_ENV = {
   baseUrl: (import.meta.env.VITE_GLPI_URL as string) || 'https://sistema.esdi.com.br',
-  apiPath: (import.meta.env.VITE_GLPI_API_PATH as string) || '/apirest.php',
+  apiPath: (import.meta.env.VITE_GLPI_API_PATH as string) || '/api.php/v2.2',
+  ticketEndpoint: (import.meta.env.VITE_GLPI_TICKET_ENDPOINT as string) || '/Assistance/Ticket',
   appToken: (import.meta.env.VITE_GLPI_APP_TOKEN as string) || '',
   userToken: (import.meta.env.VITE_GLPI_USER_TOKEN as string) || '',
+  bearerToken: (import.meta.env.VITE_GLPI_BEARER_TOKEN as string) || '',
 };
 
 // ==========================================

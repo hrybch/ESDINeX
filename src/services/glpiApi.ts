@@ -12,13 +12,16 @@ import {
 
 export const DEFAULT_GLPI_CONFIG: GlpiApiConfig = {
   baseUrl: 'https://sistema.esdi.com.br',
-  apiPath: '/apirest.php',
-  appToken: 'esdi_glpi_app_cartorios_v2',
-  userToken: 'usr_token_cartorio_suporte_ti',
-  sessionToken: 'glpi_sess_7721ba89c09',
-  isConnected: true,
-  lastSync: 'Hoje às 09:45',
+  apiPath: '/api.php/v2.2',
+  ticketEndpoint: '/Assistance/Ticket',
+  appToken: '',
+  userToken: '',
+  bearerToken: '',
+  sessionToken: '',
+  isConnected: false,
+  lastSync: 'Aguardando sincronização...',
   isMockFallback: false,
+  autoRefreshInterval: 30,
 };
 
 export const GLPI_CATEGORIES: GlpiCategory[] = [

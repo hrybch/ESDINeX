@@ -126,6 +126,17 @@ export const GerenciadorUsuarios: React.FC = () => {
     alert(`Sessão alterada para: ${user.name} (${user.role}). O WebOS agora reflete as permissões desta conta.`);
   };
 
+  const handleDeleteUser = (user: UserProfile) => {
+    if (user.id === currentUser.id) {
+      alert('Você não pode excluir a sua própria conta enquanto estiver logado com ela.');
+      return;
+    }
+    if (confirm(`Atenção: Tem certeza de que deseja excluir o cadastro do usuário "${user.name}" (${user.email})?\n\nEsta ação removerá permanentemente as permissões dele do sistema.`)) {
+      const res = deleteUser(user.id);
+      alert(res.message);
+    }
+  };
+
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
       case 'SUPORTE_N2_ADMIN':
@@ -398,11 +409,7 @@ export const GerenciadorUsuarios: React.FC = () => {
 
                           {!isCurrent && (
                             <button
-                              onClick={() => {
-                                if (confirm(`Deseja excluir o usuário ${user.name}?`)) {
-                                  deleteUser(user.id);
-                                }
-                              }}
+                              onClick={() => handleDeleteUser(user)}
                               title="Excluir Usuário"
                               className="p-1 hover:bg-rose-950/40 text-slate-500 hover:text-rose-400 rounded transition-colors"
                             >
