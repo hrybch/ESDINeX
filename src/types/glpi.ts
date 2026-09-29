@@ -35,6 +35,7 @@ export interface GlpiTicket {
   requester_name?: string;
   users_id_assign?: number;
   assigned_name?: string;
+  cartorio_cns?: string;
   followups_count?: number;
   tasks_count?: number;
 }
@@ -85,6 +86,7 @@ export interface GlpiEntity {
   name: string; // Nome do Cliente / Contrato
   unidade: string;
   regiao: string;
+  cns?: string;
 }
 
 export interface GlpiKnowbaseItem {
@@ -101,6 +103,7 @@ export interface GlpiPlanningItem {
   title: string;
   ticket_id: number;
   cliente: string;
+  cartorio?: string;
   begin: string;
   end: string;
   technician: string;

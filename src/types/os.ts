@@ -1,4 +1,4 @@
-export type UserRole = 'SUPORTE_N1' | 'SUPORTE_N2_ADMIN' | 'FINANCEIRO' | 'GESTOR_TI';
+export type UserRole = 'SUPORTE_N1' | 'SUPORTE_N2_ADMIN' | 'FINANCEIRO' | 'GESTOR_TI' | 'GESTOR_CARTORIO';
 
 export interface UserProfile {
   id: string;

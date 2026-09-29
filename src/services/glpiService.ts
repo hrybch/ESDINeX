@@ -193,6 +193,7 @@ export interface NormalizedTicket {
   cliente_unidade?: string;
   requester_name: string;
   assigned_name: string;
+  cartorio_cns?: string;
   followups_count: number;
   tasks_count: number;
 }
