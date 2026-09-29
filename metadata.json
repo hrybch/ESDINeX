@@ -1,0 +1,8 @@
+{
+  "name": "ESDINeX - Extranet WebOS de Suporte TI",
+  "description": "Ambiente operacional Web Desktop para centralização de ferramentas, chamados, monitoramento e suporte de TI com RBAC e janelas flutuantes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
