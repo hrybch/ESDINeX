@@ -562,7 +562,7 @@ const [isRolePermModalOpen, setIsRolePermModalOpen] = useState(false);
                 />
               </div>
 
-              {/* Permissions checklist */}
+              {/* Permissions checklist 
               <div className="space-y-1">
                 <span className="text-slate-300 font-medium">Permissões</span>
                 <div className="grid grid-cols-2 gap-2">
@@ -578,7 +578,7 @@ const [isRolePermModalOpen, setIsRolePermModalOpen] = useState(false);
                     </label>
                   ))}
                 </div>
-              </div>
+              </div> */}
 
               {/* 2FA mandatory – generate QR */}
               <div className="space-y-1">
