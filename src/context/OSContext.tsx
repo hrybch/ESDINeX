@@ -18,6 +18,7 @@ interface OSContextType {
   logout: () => void;
   lockSession: () => void;
   unlockSession: (token2fa: string) => boolean;
+  updateAppRoles: (appId: string, roles: UserRole[]) => void;
 
   // Users Management
   users: UserProfile[];
@@ -178,11 +179,38 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }
   }, [deletedAppIds]);
 
+  // Role Override RBAC
+  const [roleOverrides, setRoleOverrides] = useState<Record<string, UserRole[]>>(() => {
+    try {
+      const saved = localStorage.getItem('esdinex_app_role_overrides');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('esdinex_app_role_overrides', JSON.stringify(roleOverrides));
+    } catch {
+      // ignore
+    }
+  }, [roleOverrides]);
+
   const allApps = useMemo(() => {
-    return [...DEFAULT_APPS_REGISTRY, ...customApps].filter(
-      app => !deletedAppIds.includes(app.id)
+    return [...DEFAULT_APPS_REGISTRY, ...customApps].map(app =>
+      roleOverrides[app.id] ? { ...app, allowedRoles: roleOverrides[app.id] } : app
     );
-  }, [customApps, deletedAppIds]);
+  }, [customApps, roleOverrides]);
+
+  const updateAppRoles = useCallback((appId: string, roles: UserRole[]) => {
+    // Anti-lockout: o admin N2 nunca perde acesso ao gerenciador de usuários
+    const safeRoles =
+      appId === 'app_gerenciador_usuarios' && !roles.includes('SUPORTE_N2_ADMIN')
+        ? [...roles, 'SUPORTE_N2_ADMIN' as UserRole]
+        : roles;
+    setRoleOverrides(prev => ({ ...prev, [appId]: safeRoles }));
+  }, []);
 
   const [windows, setWindows] = useState<WindowInstance[]>([]);
   const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
@@ -667,6 +695,7 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         deleteUser,
         setUserRole,
         // RBAC role permissions
+        updateAppRoles,
         getPermissionsForRole,
         setPermissionsForRole,
         allApps,

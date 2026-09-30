@@ -29,7 +29,9 @@ export const GerenciadorUsuarios: React.FC = () => {
     setCurrentUser,
     addUser,
     updateUser,
-    deleteUser
+    deleteUser,
+    getPermissionsForRole,
+    setPermissionsForRole,
   } = useOS();
 
   // Search & Filter state
@@ -39,7 +41,6 @@ export const GerenciadorUsuarios: React.FC = () => {
 
   // Modal State for New User
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-const [isRolePermModalOpen, setIsRolePermModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('SUPORTE_N1');
@@ -48,6 +49,11 @@ const [isRolePermModalOpen, setIsRolePermModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newPermissions, setNewPermissions] = useState<PermissionAction[]>([]);
+
+  // Role-Permission Modal state
+  const [isRolePermModalOpen, setIsRolePermModalOpen] = useState(false);
+  const [selectedRolePerm, setSelectedRolePerm] = useState<UserRole>('SUPORTE_N1');
+  const [tempPermissions, setTempPermissions] = useState<PermissionAction[]>([]);
 
   // TOTP secret & QR handling
   const [newTotpSecret, setNewTotpSecret] = useState('');
@@ -215,20 +221,25 @@ const [isRolePermModalOpen, setIsRolePermModalOpen] = useState(false);
           </div>
         </div>
 
-        <button
-          onClick={() => setIsRolePermModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
-        >
-          <Settings className="w-4 h-4" />
-          <span>Gerenciar Permissões de Role</span>
-        </button>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Cadastrar Novo Usuário</span>
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => {
+              setTempPermissions(getPermissionsForRole(selectedRolePerm));
+              setIsRolePermModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+          >
+            <Settings className="w-4 h-4" />
+            <span>Gerenciar Permissões de Role</span>
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Cadastrar Novo Usuário</span>
+          </button>
+        </div>
       </div>
 
       {/* Metric Cards */}
@@ -616,6 +627,106 @@ const [isRolePermModalOpen, setIsRolePermModalOpen] = useState(false);
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Gerenciar Permissões de Role */}
+      {isRolePermModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-xl shadow-2xl text-xs">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-green-400" />
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  Gerenciar Permissões de Role
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsRolePermModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                title="Fechar"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              {/* Role selector */}
+              <div className="space-y-1">
+                <label className="text-slate-300 font-medium">Selecione o Papel (Role)</label>
+                <select
+                  value={selectedRolePerm}
+                  onChange={e => {
+                    const role = e.target.value as UserRole;
+                    setSelectedRolePerm(role);
+                    setTempPermissions(getPermissionsForRole(role));
+                  }}
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded text-slate-200 focus:outline-none focus:border-green-500"
+                >
+                  <option value="SUPORTE_N1">Suporte N1</option>
+                  <option value="SUPORTE_N2_ADMIN">Suporte N2 / SysAdmin</option>
+                  <option value="GESTOR_TI">Gestor de TI</option>
+                  <option value="FINANCEIRO">Financeiro</option>
+                  <option value="GESTOR_CARTORIO">Gestor Cartório</option>
+                </select>
+              </div>
+
+              {/* Permission checklist */}
+              <div className="space-y-1">
+                <span className="text-slate-300 font-medium">Permissões para este Role</span>
+                <div className="mt-2 grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                  {(['create_user', 'register_app', 'delete_user', 'delete_app', 'view_reports'] as PermissionAction[]).map(perm => (
+                    <label
+                      key={perm}
+                      className="flex items-center gap-2 px-3 py-2 bg-slate-950 border border-slate-800 rounded cursor-pointer hover:border-green-600 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={tempPermissions.includes(perm)}
+                        onChange={() =>
+                          setTempPermissions(prev =>
+                            prev.includes(perm)
+                              ? prev.filter(p => p !== perm)
+                              : [...prev, perm]
+                          )
+                        }
+                        className="rounded border-slate-600 text-green-600 focus:ring-0 focus:ring-offset-0"
+                      />
+                      <span className="text-slate-200 capitalize">{perm.replace(/_/g, ' ')}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-slate-500 text-[10px]">
+                As permissões salvas aqui serão aplicadas a todos os usuários com este papel.
+              </p>
+            </div>
+
+            {/* Footer actions */}
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsRolePermModalOpen(false)}
+                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPermissionsForRole(selectedRolePerm, tempPermissions);
+                  setIsRolePermModalOpen(false);
+                  alert(`Permissões do papel "${selectedRolePerm}" salvas com sucesso!`);
+                }}
+                className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded font-semibold transition-colors"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 inline mr-1" />
+                Salvar Permissões
+              </button>
+            </div>
           </div>
         </div>
       )}
