@@ -248,7 +248,23 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   // User Management Handlers
   const addUser = useCallback((newUser: UserProfile) => {
-    setUsers(prev => [newUser, ...prev]);
+    const user = {
+      ...newUser,
+      password: newUser.password ?? '',
+      totpSecret: newUser.totpSecret ?? '',
+      permissions: newUser.permissions ?? [],
+    };
+    setUsers(prev => [user, ...prev]);
+  }, []);
+
+    const [newPassword, setNewPassword] = useState('');
+…
+<input
+  type="password"
+  value={newPassword}
+  onChange={e => setNewPassword(e.target.value)}
+  placeholder="Senha inicial"
+  className="…" />
   }, []);
 
   const updateUser = useCallback((id: string, updates: Partial<UserProfile>) => {

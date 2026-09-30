@@ -43,7 +43,11 @@ export const GerenciadorUsuarios: React.FC = () => {
   const [newRole, setNewRole] = useState<UserRole>('SUPORTE_N1');
   const [newDepartamento, setNewDepartamento] = useState('NOC / Suporte N1');
   const [newCliente, setNewCliente] = useState('Central de Operações ESDI');
-  const [newPhone, setNewPhone] = useState('(11) 98765-4321');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPermissions, setNewPermissions] = useState<PermissionAction[]>([]);
+
+  // existing state lines continue
+
   const [new2faMethod, setNew2faMethod] = useState<'totp' | 'certificado_a3' | 'sms'>('totp');
   const [new2faEnabled, setNew2faEnabled] = useState(true);
 

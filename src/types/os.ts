@@ -13,6 +13,10 @@ export interface UserProfile {
   status: 'ativo' | 'bloqueado';
   lastLogin?: string;
   phone?: string;
+  /** NOVO */
+  password?: string;                 // senha inicial (para demo)
+  totpSecret?: string;               // segredo TOTP gerado
+  permissions?: PermissionAction[]; // lista de permissões atribuídas ao usuário
 }
 
 export type AppCategory = 
@@ -93,3 +97,10 @@ export interface SystemNotification {
   timestamp: string;
   read: boolean;
 }
+
+export type PermissionAction =
+  | 'create_user'
+  | 'register_app'
+  | 'delete_user'
+  | 'delete_app'
+  | 'view_reports';
