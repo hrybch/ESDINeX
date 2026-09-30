@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useMemo, useCallback, useEf
 import { 
   AppDefinition, 
   WindowInstance, 
-  UserRole, 
+  UserRole, PermissionAction, 
   UserProfile, 
   WindowBounds, 
   SystemNotification,
@@ -27,6 +27,9 @@ interface OSContextType {
   updateUser: (id: string, updates: Partial<UserProfile>) => void;
   deleteUser: (id: string) => { success: boolean; message: string };
   setUserRole: (role: UserRole) => void;
+  // RBAC role permissions
+  getPermissionsForRole: (role: UserRole) => PermissionAction[];
+  setPermissionsForRole: (role: UserRole, perms: PermissionAction[]) => void;
 
   // Apps & Window Management
   allApps: AppDefinition[];
@@ -73,13 +76,37 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }
   });
 
+  // Role‑based permissions mapping (RBAC)
+  const [rolePermissions, setRolePermissions] = useState<Record<UserRole, PermissionAction[]>>(() => {
+    try {
+      const saved = localStorage.getItem('esdinex_role_permissions');
+      return saved ? JSON.parse(saved) : {} as Record<UserRole, PermissionAction[]>;
+    } catch {
+      return {} as Record<UserRole, PermissionAction[]>;
+    }
+  });
+
+  // Persist role permissions
   useEffect(() => {
     try {
-      localStorage.setItem('esdinex_users_registry', JSON.stringify(users));
-    } catch {
-      // ignore
-    }
-  }, [users]);
+      localStorage.setItem('esdinex_role_permissions', JSON.stringify(rolePermissions));
+    } catch {}
+  }, [rolePermissions]);
+
+  // Getter for role permissions
+  const getPermissionsForRole = useCallback(
+    (role: UserRole) => rolePermissions[role] ?? [],
+    [rolePermissions]
+  );
+
+  // Setter for role permissions
+  const setPermissionsForRole = useCallback(
+    (role: UserRole, perms: PermissionAction[]) => {
+      setRolePermissions(prev => ({ ...prev, [role]: perms }));
+    },
+    []
+  );
+
 
   // Current active user
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
@@ -257,15 +284,7 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     setUsers(prev => [user, ...prev]);
   }, []);
 
-    const [newPassword, setNewPassword] = useState('');
-…
-<input
-  type="password"
-  value={newPassword}
-  onChange={e => setNewPassword(e.target.value)}
-  placeholder="Senha inicial"
-  className="…" />
-  }, []);
+
 
   const updateUser = useCallback((id: string, updates: Partial<UserProfile>) => {
     setUsers(prev =>
@@ -647,6 +666,9 @@ export const OSProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         updateUser,
         deleteUser,
         setUserRole,
+        // RBAC role permissions
+        getPermissionsForRole,
+        setPermissionsForRole,
         allApps,
         authorizedApps,
         registerApp,

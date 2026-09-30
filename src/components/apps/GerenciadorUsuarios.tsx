@@ -1,34 +1,35 @@
-import React, { useState } from 'react';
-import { 
-  Users, 
-  UserPlus, 
-  Search, 
-  ShieldCheck, 
-  ShieldAlert, 
-  Lock, 
-  KeyRound, 
-  Smartphone, 
-  CheckCircle2, 
-  XCircle, 
-  Trash2, 
-  RefreshCw, 
-  Building2, 
-  Filter, 
-  UserCheck, 
-  Mail, 
-  Phone
+import React, { useState, useEffect } from 'react';
+import {
+  Users,
+  UserPlus,
+  Search,
+  ShieldCheck,
+  ShieldAlert,
+  Lock,
+  KeyRound,
+  Smartphone,
+  CheckCircle2,
+  XCircle,
+  Trash2,
+  RefreshCw,
+  Building2,
+  Filter,
+  UserCheck,
+  Mail,
+  Phone,
+  Settings,
 } from 'lucide-react';
 import { useOS } from '../../context/OSContext';
-import { UserProfile, UserRole } from '../../types/os';
+import { UserRole, PermissionAction, UserProfile } from '../../types/os';
 
 export const GerenciadorUsuarios: React.FC = () => {
-  const { 
-    users, 
-    currentUser, 
-    setCurrentUser, 
-    addUser, 
-    updateUser, 
-    deleteUser 
+  const {
+    users,
+    currentUser,
+    setCurrentUser,
+    addUser,
+    updateUser,
+    deleteUser
   } = useOS();
 
   // Search & Filter state
@@ -38,18 +39,20 @@ export const GerenciadorUsuarios: React.FC = () => {
 
   // Modal State for New User
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+const [isRolePermModalOpen, setIsRolePermModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('SUPORTE_N1');
   const [newDepartamento, setNewDepartamento] = useState('NOC / Suporte N1');
   const [newCliente, setNewCliente] = useState('Central de Operações ESDI');
   const [newPassword, setNewPassword] = useState('');
+  const [newPhone, setNewPhone] = useState('');
   const [newPermissions, setNewPermissions] = useState<PermissionAction[]>([]);
 
-  // existing state lines continue
-
-  const [new2faMethod, setNew2faMethod] = useState<'totp' | 'certificado_a3' | 'sms'>('totp');
-  const [new2faEnabled, setNew2faEnabled] = useState(true);
+  // TOTP secret & QR handling
+  const [newTotpSecret, setNewTotpSecret] = useState('');
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [new2faEnabled, setNew2faEnabled] = useState(true); // always true for new users
 
   // Filtered users calculation
   const filteredUsers = users.filter(u => {
@@ -59,7 +62,7 @@ export const GerenciadorUsuarios: React.FC = () => {
                         (u.departamento && u.departamento.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchRole = roleFilter === 'ALL' || u.role === roleFilter;
-    const match2fa = twoFactorFilter === 'ALL' || 
+    const match2fa = twoFactorFilter === 'ALL' ||
                      (twoFactorFilter === 'ENABLED' && u.twoFactorEnabled) ||
                      (twoFactorFilter === 'DISABLED' && !u.twoFactorEnabled);
 
@@ -74,23 +77,35 @@ export const GerenciadorUsuarios: React.FC = () => {
     blocked: users.filter(u => u.status === 'bloqueado').length,
   };
 
+  // Handlers
+  const handleGenerateQR = () => {
+    // Lazy‑load speakeasy to avoid bundling it on every render
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const speakeasy = require('speakeasy');
+    const secret = speakeasy.generateSecret({ name: `ESDINeX (${newEmail})` });
+    setNewTotpSecret(secret.base32);
+    setQrCodeUrl(secret.otpauth_url);
+  };
+
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newEmail.trim()) {
       alert('Informe ao menos o nome completo e o e-mail do técnico/operador.');
       return;
     }
-
     const newUser: UserProfile = {
       id: `usr_${Date.now()}`,
       name: newName.trim(),
       email: newEmail.trim().toLowerCase(),
+      password: newPassword,
       role: newRole,
       clienteAtribuicao: newCliente.trim(),
       departamento: newDepartamento.trim(),
       phone: newPhone.trim(),
       twoFactorEnabled: new2faEnabled,
-      twoFactorMethod: new2faMethod,
+      twoFactorMethod: 'totp',
+      totpSecret: newTotpSecret,
+      permissions: newPermissions,
       status: 'ativo',
       lastLogin: 'Nunca acessou',
     };
@@ -100,6 +115,14 @@ export const GerenciadorUsuarios: React.FC = () => {
     // Reset form
     setNewName('');
     setNewEmail('');
+    setNewPassword('');
+    setNewPhone('');
+    setNewDepartamento('NOC / Suporte N1');
+    setNewCliente('Central de Operações ESDI');
+    setNewRole('SUPORTE_N1');
+    setNewPermissions([]);
+    setNewTotpSecret('');
+    setQrCodeUrl('');
     setIsAddModalOpen(false);
     alert(`Usuário "${newUser.name}" cadastrado com sucesso com 2FA corporativo!`);
   };
@@ -165,6 +188,12 @@ export const GerenciadorUsuarios: React.FC = () => {
     }
   };
 
+  const togglePermission = (perm: PermissionAction) => {
+    setNewPermissions(prev =>
+      prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]
+    );
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-950 text-slate-100 font-sans select-text">
       {/* Top Header */}
@@ -187,6 +216,13 @@ export const GerenciadorUsuarios: React.FC = () => {
         </div>
 
         <button
+          onClick={() => setIsRolePermModalOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+        >
+          <Settings className="w-4 h-4" />
+          <span>Gerenciar Permissões de Role</span>
+        </button>
+        <button
           onClick={() => setIsAddModalOpen(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
         >
@@ -202,7 +238,6 @@ export const GerenciadorUsuarios: React.FC = () => {
           <div className="text-xl font-bold font-mono text-white mt-1">{stats.total}</div>
           <div className="text-[10px] text-slate-500 mt-0.5">Analistas & Operadores</div>
         </div>
-
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-lg">
           <div className="text-[10px] text-slate-400 uppercase tracking-wider">Compliance 2FA</div>
           <div className="text-xl font-bold font-mono text-emerald-400 mt-1">
@@ -212,13 +247,11 @@ export const GerenciadorUsuarios: React.FC = () => {
             {Math.round((stats.twoFactorActive / (stats.total || 1)) * 100)}% das contas protegidas
           </div>
         </div>
-
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-lg">
           <div className="text-[10px] text-slate-400 uppercase tracking-wider">Administradores & Gestão</div>
           <div className="text-xl font-bold font-mono text-blue-400 mt-1">{stats.admins}</div>
           <div className="text-[10px] text-slate-500 mt-0.5">Acesso administrativo total</div>
         </div>
-
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-lg">
           <div className="text-[10px] text-slate-400 uppercase tracking-wider">Contas Bloqueadas</div>
           <div className={`text-xl font-bold font-mono mt-1 ${stats.blocked > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
@@ -298,7 +331,6 @@ export const GerenciadorUsuarios: React.FC = () => {
                 filteredUsers.map(user => {
                   const roleBadge = getRoleBadge(user.role);
                   const isCurrent = user.id === currentUser.id;
-
                   return (
                     <tr key={user.id} className="hover:bg-slate-900/50 transition-colors">
                       {/* Name & Email */}
@@ -470,6 +502,18 @@ export const GerenciadorUsuarios: React.FC = () => {
                 />
               </div>
 
+              <div className="space-y-1">
+                <label className="text-slate-300 font-medium">Senha Inicial *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="********"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded text-slate-200 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="text-slate-300 font-medium">Cliente / Empresa Suportada</label>
@@ -494,33 +538,18 @@ export const GerenciadorUsuarios: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-slate-300 font-medium">Perfil RBAC</label>
-                  <select
-                    value={newRole}
-                    onChange={e => setNewRole(e.target.value as UserRole)}
-                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded text-slate-200 focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="SUPORTE_N1">Suporte N1</option>
-                    <option value="SUPORTE_N2_ADMIN">Suporte N2 / SysAdmin</option>
-                    <option value="GESTOR_TI">Gestor de TI</option>
-                    <option value="FINANCEIRO">Financeiro</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-slate-300 font-medium">Método 2FA</label>
-                  <select
-                    value={new2faMethod}
-                    onChange={e => setNew2faMethod(e.target.value as any)}
-                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded text-slate-200 focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="totp">App TOTP</option>
-                    <option value="certificado_a3">Certificado Digital A3</option>
-                    <option value="sms">SMS Token</option>
-                  </select>
-                </div>
+              <div className="space-y-1">
+                <label className="text-slate-300 font-medium">Perfil RBAC</label>
+                <select
+                  value={newRole}
+                  onChange={e => setNewRole(e.target.value as UserRole)}
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded text-slate-200 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="SUPORTE_N1">Suporte N1</option>
+                  <option value="SUPORTE_N2_ADMIN">Suporte N2 / SysAdmin</option>
+                  <option value="GESTOR_TI">Gestor de TI</option>
+                  <option value="FINANCEIRO">Financeiro</option>
+                </select>
               </div>
 
               <div className="space-y-1">
@@ -533,29 +562,55 @@ export const GerenciadorUsuarios: React.FC = () => {
                 />
               </div>
 
-              <div className="pt-1">
-                <label className="flex items-center gap-2 cursor-pointer text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={new2faEnabled}
-                    onChange={e => setNew2faEnabled(e.target.checked)}
-                    className="rounded border-slate-800 text-blue-600 focus:ring-0"
-                  />
-                  <span>Exigir 2FA no login (Recomendado para Segurança da Informação)</span>
-                </label>
+              {/* Permissions checklist */}
+              <div className="space-y-1">
+                <span className="text-slate-300 font-medium">Permissões</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {['create_user', 'register_app', 'delete_user', 'delete_app', 'view_reports'].map(p => (
+                    <label key={p} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={newPermissions.includes(p as PermissionAction)}
+                        onChange={() => togglePermission(p as PermissionAction)}
+                        className="rounded border-slate-800 text-blue-600 focus:ring-0"
+                      />
+                      <span className="text-slate-200">{p.replace('_', ' ')}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              {/* 2FA mandatory – generate QR */}
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={handleGenerateQR}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded"
+                >
+                  <KeyRound className="w-4 h-4" /> Gerar QR Code (TOTP)
+                </button>
+                {qrCodeUrl && (
+                  <div className="mt-2 flex justify-center">
+                    {(() => {
+                      // eslint-disable-next-line @typescript-eslint/no-var-requires
+                      const QRCode = require('react-qr-code').default;
+                      return <QRCode value={qrCodeUrl} size={180} />;
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded"
+                  className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded shadow-sm"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded"
                 >
                   Salvar Usuário
                 </button>
